@@ -6,71 +6,77 @@
 
 Навчитися основам DevOps.
 
-## Lesson 3
+## Lesson 4
 
-Тема «Linux адміністрування»
+Тема «Docker»
+
+# Django + PostgreSQL + Nginx (Docker Compose)
+
+Мінімальний проєкт: Django вебзастосунок, база даних PostgreSQL і Nginx як реверс‑проксі. Усе контейнеризовано Docker та керується через Docker Compose.
 
 ###
 
-Bash-скрипт для автоматичного встановлення Docker, Docker Compose, Python і Django
+![Скріншот вебзастосунку](lesson-4.png)
 
-###
+## Вимоги
 
-![Скріншот успішного встановлення](lesson-3.png)
+- Встановлені Docker Desktop з Compose
 
-## Як запустити (Ubuntu/Debian)
+## Швидкий старт
 
-- **[вимоги]** Потрібні: apt (Ubuntu/Debian), інтернет, права sudo.
-- **[кроки]**
+1. Побудувати та запустити у фоні:
+   ```bash
+   docker compose up -d --build
+   ```
+2. Перевірити доступність вебзастосунку:
+   - Відкрити http://localhost — має відобразитися `OK: Django is running`.
 
-```bash
-chmod u+x install_dev_tools.sh
-./install_dev_tools.sh
-```
+## Перевірка підключення до БД
 
-- **[що встановлюється]** Docker Engine, Docker Compose v2 (plugin), Python ≥ 3.9, Django (у venv `~/.venvs/devtools`).
-- **[ідемпотентність]** Якщо інструмент уже встановлено — повторного встановлення не буде.
+- Міграції застосовуються автоматично при старті контейнера `django`.
+- Додатково можна перевірити підключення безпосередньо до Postgres:
+  ```bash
+  docker compose exec db psql -U app_user -d app_db -c 'select 1;'
+  # або для docker-compose v1:
+  docker-compose exec db psql -U app_user -d app_db -c 'select 1;'
+  ```
+- А також перевірити, що Django бачить БД (через ORM):
+  ```bash
+  docker compose exec django python - <<'PY'
+  from django.db import connection
+  from django.conf import settings
+  print('DB:', settings.DATABASES['default'])
+  with connection.cursor() as c:
+      c.execute('SELECT 1')
+      print('SELECT 1 ->', c.fetchone())
+  PY
+  ```
 
-### Перевірка встановлення
+## Корисні команди
 
-```bash
-docker --version
-docker compose version
-python3 --version
-~/.venvs/devtools/bin/python -m django --version
-```
+- Логи сервісів:
+  ```bash
+  docker compose logs -f
+  ```
+- Зупинка і видалення контейнерів/мереж (без даних БД):
+  ```bash
+  docker compose down
+  ```
+- Повне очищення з томом БД:
+  ```bash
+  docker compose down -v
+  ```
 
-Щоб зручно викликати `django-admin`:
+## Структура
 
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.profile
-source ~/.profile
-django-admin --version
-```
+- `docker-compose.yml` — сервіси: `django`, `db`, `nginx`.
+- `Dockerfile` — образ для Django (Python 3.11-slim), встановлення `requirements.txt`, запуск `migrate` і `runserver`.
+- `nginx/nginx.conf` — проксування на `http://django:8000`.
+- `mysite/` — Django-проєкт, `settings.py` налаштований на PostgreSQL.
 
-### Примітки та усунення проблем
+## Налаштування середовища (дефолтні)
 
-- **PEP 668 (Ubuntu 24.04+)**: системний `pip` блокує глобальні інсталяції. Скрипт встановлює Django у ізольоване venv `~/.venvs/devtools`.
-- **Venv пакети**: якщо venv не створюється або немає `pip`, встановіть пакети й повторіть:
-
-```bash
-sudo apt-get update -y
-sudo apt-get install -y python3-venv python3-full "python$(python3 -c 'import sys;print(f"{sys.version_info[0]}.{sys.version_info[1]}")')-venv"
-./install_dev_tools.sh
-```
-
-- **Docker всередині контейнера**: у звичайному Docker-контейнері встановлення Docker Engine не працюватиме (немає systemd/привілеїв). Використовуйте повноцінну VM.
-
-## Тестування на macOS (опційно)
-
-Найпростіше — через Multipass (Ubuntu VM):
-
-```bash
-brew install --cask multipass
-multipass launch --name dev-ubuntu --cpus 2 --mem 4G --disk 20G lts
-multipass mount "/Users/<USER>/path/to/microservice-project" dev-ubuntu:/home/ubuntu/project
-multipass shell dev-ubuntu
-cd /home/ubuntu/project
-chmod u+x install_dev_tools.sh
-./install_dev_tools.sh
-```
+- `POSTGRES_DB=app_db`
+- `POSTGRES_USER=app_user`
+- `POSTGRES_PASSWORD=app_pass`
+- `DB_HOST=db`, `DB_PORT=5432`
