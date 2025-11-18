@@ -311,3 +311,5 @@ rm -f terraform.tfstate terraform.tfstate.backup .terraform/terraform.tfstate
 ```bash
 rm -f terraform.tfstate terraform.tfstate.backup .terraform/terraform.tfstate
 ```
+
+⚠️ Для production: краще НЕ використовувати force_destroy, щоб уникнути випадкового видалення даних.
