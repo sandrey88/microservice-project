@@ -1,0 +1,43 @@
+# ========================================
+# AWS Free Tier Configuration
+# ========================================
+# Ця конфігурація оптимізована для t3.micro nodes (1 GB RAM)
+# Для production збільште ресурси (див. README.md)
+
+# Docker image configuration
+image:
+  repository: 671334746049.dkr.ecr.eu-north-1.amazonaws.com/lesson-7-django-app
+  tag: latest
+  pullPolicy: Always
+
+# Replicas configuration (reduced for t3.micro nodes)
+replicaCount: 1
+
+# Service configuration
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8000
+
+# HPA (Horizontal Pod Autoscaler) configuration (adjusted for t3.micro)
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+# Resource limits and requests (adjusted for t3.micro nodes)
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# ConfigMap - змінні середовища
+config:
+  DJANGO_SETTINGS_MODULE: "mysite.settings"
+  DEBUG: "True"
+  ALLOWED_HOSTS: "*"
+  # PostgreSQL не розгорнуто в кластері - Django використовує SQLite за замовчуванням
