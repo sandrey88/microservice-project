@@ -488,7 +488,15 @@ kubectl get configmap django-app-config -o yaml
 helm uninstall django-app
 ```
 
-### Видалення Terraform інфраструктури
+### Почекайте ~1 хвилину поки LoadBalancer видалиться
+
+### Видаліть образи з ECR
+
+```bash
+aws ecr batch-delete-image --repository-name lesson-7-django-app --image-ids imageTag=latest
+```
+
+### Видалення Terraform
 
 ```bash
 # Видалити всю інфраструктуру
