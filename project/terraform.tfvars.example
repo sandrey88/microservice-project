@@ -1,0 +1,7 @@
+# GitHub Configuration
+github_username = "your-github-username"
+github_token    = "ghp_your_github_personal_access_token"
+
+# Repository URLs
+github_repo_url = "https://github.com/your-username/django-app.git"
+helm_repo_url   = "https://github.com/your-username/helm-charts.git"

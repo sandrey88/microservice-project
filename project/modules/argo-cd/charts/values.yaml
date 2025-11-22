@@ -1,0 +1,28 @@
+applications:
+  - name: django-app
+    namespace: default
+    project: default
+    source:
+      repoURL: https://github.com/YOUR_USERNAME/helm-charts.git
+      path: django-app
+      targetRevision: main
+      helm:
+        valueFiles:
+          - values.yaml
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: default
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+repositories:
+  - name: django-app
+    url: https://github.com/YOUR_USERNAME/helm-charts.git
+    username: YOUR_USERNAME
+    password: YOUR_TOKEN
+
+repoConfig:
+  insecure: "true"
+  enableLfs: "true"

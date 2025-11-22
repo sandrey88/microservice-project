@@ -1,0 +1,115 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: kaniko-git
+spec:
+  serviceAccountName: jenkins-sa
+  containers:
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.16.0-debug
+      imagePullPolicy: Always
+      command:
+        - sleep
+      args:
+        - 99d
+    - name: git
+      image: alpine/git
+      command:
+        - sleep
+      args:
+        - 99d
+"""
+    }
+  }
+
+  environment {
+    // ECR Configuration - замініть на ваш ECR registry
+    ECR_REGISTRY = "YOUR_AWS_ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com"
+    IMAGE_NAME   = "project-django-app"
+    IMAGE_TAG    = "v1.0.${BUILD_NUMBER}"
+
+    // Git Configuration
+    COMMIT_EMAIL = "jenkins@localhost"
+    COMMIT_NAME  = "Jenkins CI"
+    
+    // Helm Charts Repository - замініть на ваш репозиторій
+    HELM_REPO    = "https://github.com/YOUR_USERNAME/helm-charts.git"
+    HELM_CHART_PATH = "charts/django-app"
+  }
+
+  stages {
+    stage('Build & Push Docker Image') {
+      steps {
+        container('kaniko') {
+          sh '''
+            echo "Building Docker image..."
+            /kaniko/executor \\
+              --context `pwd` \\
+              --dockerfile `pwd`/Dockerfile \\
+              --destination=$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \\
+              --destination=$ECR_REGISTRY/$IMAGE_NAME:latest \\
+              --cache=true \\
+              --insecure \\
+              --skip-tls-verify
+            
+            echo "Image built and pushed: $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+          '''
+        }
+      }
+    }
+
+    stage('Update Helm Chart Tag') {
+      steps {
+        container('git') {
+          withCredentials([usernamePassword(
+            credentialsId: 'github-token',
+            usernameVariable: 'GIT_USERNAME',
+            passwordVariable: 'GIT_PAT'
+          )]) {
+            sh '''
+              echo "Cloning Helm charts repository..."
+              git clone https://$GIT_USERNAME:$GIT_PAT@${HELM_REPO#https://}
+              
+              REPO_NAME=$(basename $HELM_REPO .git)
+              cd $REPO_NAME/$HELM_CHART_PATH
+              
+              echo "Current values.yaml:"
+              cat values.yaml | grep "tag:"
+              
+              echo "Updating image tag to $IMAGE_TAG..."
+              sed -i "s/tag: .*/tag: $IMAGE_TAG/" values.yaml
+              
+              echo "New values.yaml:"
+              cat values.yaml | grep "tag:"
+              
+              git config user.email "$COMMIT_EMAIL"
+              git config user.name "$COMMIT_NAME"
+              
+              git add values.yaml
+              git commit -m "Update image tag to $IMAGE_TAG [skip ci]"
+              git push origin main
+              
+              echo "Helm chart updated successfully!"
+            '''
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Pipeline completed successfully!"
+      echo "Image: $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+      echo "Argo CD will automatically sync the changes."
+    }
+    failure {
+      echo "Pipeline failed. Please check the logs."
+    }
+  }
+}

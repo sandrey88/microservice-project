@@ -1,0 +1,8 @@
+server:
+  service:
+    type: LoadBalancer
+    port: 443
+
+configs:
+  params:
+    server.insecure: true
