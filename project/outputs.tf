@@ -3,12 +3,12 @@
 # ========================================
 output "s3_bucket_name" {
   description = "Назва S3 бакета для Terraform state"
-  value       = module.s3_backend.bucket_name
+  value       = module.s3_backend.s3_bucket_name
 }
 
 output "dynamodb_table_name" {
   description = "Назва DynamoDB таблиці для state locking"
-  value       = module.s3_backend.table_name
+  value       = module.s3_backend.dynamodb_table_name
 }
 
 # ========================================

@@ -11,13 +11,13 @@ controller:
 
   resources:
     limits:
-      cpu: "400m"
+      cpu: "600m"
       memory: "768Mi"
     requests:
-      cpu: "200m"
-      memory: "384Mi"
+      cpu: "300m"
+      memory: "512Mi"
 
-  persistentVolume:
+  persistence:
     enabled: true
     storageClass: "ebs-sc"
     size: 10Gi
@@ -37,8 +37,24 @@ controller:
     name: jenkins-sa
     create: false
 
+agent:
+  resources:
+    requests:
+      cpu: "300m"
+      memory: "384Mi"
+    limits:
+      cpu: "600m"
+      memory: "512Mi"
+
   JCasC:
     configScripts:
+      security: |
+        security:
+          scriptApproval:
+            approvedSignatures:
+              - "method groovy.lang.GroovyObject invokeMethod java.lang.String java.lang.Object"
+              - "new groovy.lang.GroovyShell"
+              - "staticMethod org.codehaus.groovy.runtime.DefaultGroovyMethods getText java.io.File"
       credentials: |
         credentials:
           system:

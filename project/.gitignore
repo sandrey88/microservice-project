@@ -41,3 +41,7 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Cloned repositories (not part of project structure)
+django-app/
+helm-charts/

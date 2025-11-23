@@ -2,37 +2,39 @@
 
 Повний CI/CD pipeline для Django застосунку з автоматичним білдом, деплоєм та синхронізацією через GitOps.
 
-## ⚠️ AWS Free Tier Configuration
+![Скріншот вебзастосунку](app.png)
 
-**Цей проєкт оптимізовано для AWS Free Tier!**
+![Скріншот Jenkins](jenkins.png)
 
-- **Instance Type**: `t3.micro` (750 годин/міс безкоштовно)
-- **Nodes**: 2× t3.micro (1 GB RAM кожна)
-- **Resources**: Мінімізовані для роботи на t3.micro
-- **Replicas**: 1 pod за замовчуванням (замість 2)
-- **HPA**: 1-3 pods (замість 2-6)
+![Скріншот Argo CD](argocd.png)
 
-### Для Production
+## ⚠️ AWS Instance Type Configuration
 
-Якщо ви не на Free Tier, змініть в `main.tf`:
+**Цей проєкт налаштовано на t3.small (3 ноди)**
 
-```hcl
-instance_type = "t3.medium"  # або t3.large
-desired_size  = 3
+### Чому t3.small?
+
+AWS Free Tier **блокує** всі non-Free-Tier інстанси (t3.medium, t2.medium) з помилкою:
+
+```
+InvalidParameterCombination - The specified instance type is not eligible for Free Tier
 ```
 
-І в `charts/django-app/values.yaml`:
+Тому використовуємо **t3.small** з оптимізацією:
 
-```yaml
-replicaCount: 2
-resources:
-  limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 250m
-    memory: 256Mi
-```
+- **Instance Type**: `t3.small` (2 vCPU, 2 GB RAM)
+- **Nodes**: 3× t3.small (для Jenkins pipeline потрібна окрема нода)
+- **Оптимізація**: Зменшені ресурси Jenkins та Argo CD
+- **Argo CD**: Вимкнено Dex (SSO) та Notifications
+- **Storage**: EBS volumes через EBS CSI Driver
+
+### Розподіл навантаження:
+
+- **Нода 1**: Argo CD pods (~900 MB RAM)
+- **Нода 2**: Jenkins controller (~600 MB RAM)
+- **Нода 3**: Jenkins pipeline pod (~600 MB RAM)
+
+**Для production** рекомендується t3.medium або більше.
 
 ## 🎯 Що реалізовано
 
@@ -44,6 +46,8 @@ resources:
 - **EKS**: Kubernetes кластер з EBS CSI Driver
 - **Jenkins**: CI сервер з автоматичною конфігурацією (JCasC)
 - **Argo CD**: GitOps CD інструмент з автоматичною синхронізацією
+
+!!! Поточний регіон в проєкті - "eu-north-1", за потреби його можна змінити.
 
 ### CI/CD Pipeline
 

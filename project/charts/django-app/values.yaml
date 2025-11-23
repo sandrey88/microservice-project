@@ -1,19 +1,18 @@
 # ========================================
-# AWS Free Tier Configuration (t3.micro)
+# Production Configuration (t3.small)
 # ========================================
 # Цей Helm chart керується через Argo CD
 # Image tag оновлюється автоматично через Jenkins pipeline
-# Ресурси оптимізовані для t3.micro nodes (1 GB RAM)
-# Для production збільште ресурси (див. README.md)
+# Ресурси оптимізовані для t3.small nodes (2 GB RAM)
 
 # Docker image configuration
 image:
-  repository: YOUR_AWS_ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/project-django-app
-  tag: v1.0.1
+  repository: 671334746049.dkr.ecr.eu-north-1.amazonaws.com/project-django-app
+  tag: "latest"
   pullPolicy: Always
 
-# Replicas configuration (reduced for t3.micro)
-replicaCount: 1
+# Replicas configuration
+replicaCount: 2
 
 # Service configuration
 service:
@@ -21,25 +20,54 @@ service:
   port: 80
   targetPort: 8000
 
-# HPA (Horizontal Pod Autoscaler) configuration (adjusted for t3.micro)
+# Ingress configuration
+ingress:
+  enabled: false
+
+# HPA (Horizontal Pod Autoscaler) configuration
 autoscaling:
   enabled: true
-  minReplicas: 1
-  maxReplicas: 3
-  targetCPUUtilizationPercentage: 70
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
 
-# Resource limits and requests (adjusted for t3.micro nodes)
+# Resource limits and requests (adjusted for t3.small nodes)
 resources:
   limits:
-    cpu: 200m
-    memory: 256Mi
+    cpu: 400m
+    memory: 384Mi
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 200m
+    memory: 192Mi
+
+# PostgreSQL dependency (Bitnami chart)
+postgresql:
+  enabled: true
+  auth:
+    username: django
+    password: django123
+    database: djangodb
+  primary:
+    persistence:
+      enabled: true
+      storageClass: "ebs-sc"
+      size: 10Gi
+    resources:
+      limits:
+        cpu: 400m
+        memory: 384Mi
+      requests:
+        cpu: 200m
+        memory: 192Mi
 
 # ConfigMap - змінні середовища
 config:
   DJANGO_SETTINGS_MODULE: "mysite.settings"
   DEBUG: "True"
   ALLOWED_HOSTS: "*"
-  # PostgreSQL не розгорнуто в кластері - Django використовує SQLite за замовчуванням
+  DATABASE_ENGINE: "postgresql"
+  DATABASE_NAME: "djangodb"
+  DATABASE_USER: "django"
+  DATABASE_PASSWORD: "django123"
+  DATABASE_HOST: "django-app-postgresql"
+  DATABASE_PORT: "5432"

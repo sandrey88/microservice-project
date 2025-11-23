@@ -25,7 +25,7 @@ data "aws_eks_cluster_auth" "eks" {
 # Helm Provider Configuration
 # ========================================
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     host                   = data.aws_eks_cluster.eks.endpoint
     cluster_ca_certificate = base64decode(data.aws_eks_cluster.eks.certificate_authority[0].data)
     token                  = data.aws_eks_cluster_auth.eks.token
@@ -56,11 +56,11 @@ module "s3_backend" {
 module "vpc" {
   source = "./modules/vpc"
 
-  vpc_name        = "project-vpc"
-  vpc_cidr        = "10.0.0.0/16"
-  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  private_subnets = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
-  azs             = ["eu-north-1a", "eu-north-1b", "eu-north-1c"]
+  vpc_name           = "project-vpc"
+  vpc_cidr_block     = "10.0.0.0/16"
+  public_subnets     = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  private_subnets    = ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"]
+  availability_zones = ["eu-north-1a", "eu-north-1b", "eu-north-1c"]
 }
 
 # ========================================
@@ -72,17 +72,17 @@ module "ecr" {
 }
 
 # ========================================
-# EKS Module (Free Tier: t3.micro)
+# EKS Module (t3.small x3 - AWS Free Tier limitation)
 # ========================================
 module "eks" {
   source = "./modules/eks"
 
   cluster_name  = "project-eks-cluster"
   subnet_ids    = concat(module.vpc.public_subnets, module.vpc.private_subnets)
-  instance_type = "t3.micro"
-  desired_size  = 2
+  instance_type = "t3.small"
+  desired_size  = 3
   max_size      = 3
-  min_size      = 1
+  min_size      = 2
 }
 
 # ========================================

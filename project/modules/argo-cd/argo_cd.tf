@@ -14,45 +14,21 @@ resource "helm_release" "argo_cd" {
 
 # Helm Release для Argo CD Applications
 resource "helm_release" "argo_apps" {
-  name      = "${var.name}-apps"
-  chart     = "${path.module}/charts"
-  namespace = var.namespace
+  name             = "${var.name}-apps"
+  chart            = "${path.module}/charts"
+  namespace        = var.namespace
   create_namespace = false
 
-  set {
-    name  = "applications[0].name"
-    value = var.app_name
-  }
-
-  set {
-    name  = "applications[0].namespace"
-    value = var.app_namespace
-  }
-
-  set {
-    name  = "applications[0].source.repoURL"
-    value = var.helm_repo_url
-  }
-
-  set {
-    name  = "applications[0].source.path"
-    value = var.helm_chart_path
-  }
-
-  set {
-    name  = "repositories[0].url"
-    value = var.helm_repo_url
-  }
-
-  set {
-    name  = "repositories[0].username"
-    value = var.github_username
-  }
-
-  set {
-    name  = "repositories[0].password"
-    value = var.github_token
-  }
+  values = [
+    templatefile("${path.module}/charts/values.yaml", {
+      app_name         = var.app_name
+      app_namespace    = var.app_namespace
+      helm_repo_url    = var.helm_repo_url
+      helm_chart_path  = var.helm_chart_path
+      github_username  = var.github_username
+      github_token     = var.github_token
+    })
+  ]
 
   depends_on = [helm_release.argo_cd]
 }

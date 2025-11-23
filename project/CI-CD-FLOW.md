@@ -1,8 +1,10 @@
 # CI/CD Flow Diagram
 
-## ⚠️ Free Tier Configuration
+## ⚠️ Instance Type Configuration
 
-Цей проєкт оптимізовано для AWS Free Tier з `t3.micro` instances.
+Цей проєкт налаштовано на `t3.small` instances (3 ноди по 2 vCPU, 2 GB RAM).
+
+**Примітка**: AWS Free Tier блокує t3.medium/t2.medium, тому використовується t3.small з оптимізацією ресурсів.
 
 ## Повний процес CI/CD
 
@@ -93,7 +95,7 @@
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ Deployment: django-app-django                                │  │
 │  │                                                              │  │
-│  │  Replicas: 1 (Free Tier optimized)                          │  │
+│  │  Replicas: 2 (Production)                                    │  │
 │  │  Image: ECR_URL/project-django-app:v1.0.X                   │  │
 │  │                                                              │  │
 │  │  Pods:                                                       │  │
@@ -111,8 +113,8 @@
 │  ┌──────────────────────────────────────────────────────────────┐  │
 │  │ HPA: django-app-django-hpa                                   │  │
 │  │                                                              │  │
-│  │  Min Replicas: 1 (Free Tier)                                 │  │
-│  │  Max Replicas: 3 (Free Tier)                                │  │
+│  │  Min Replicas: 2 (Production)                                │  │
+│  │  Max Replicas: 5 (Production)                                │  │
 │  │  Target CPU: 70%                                             │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘

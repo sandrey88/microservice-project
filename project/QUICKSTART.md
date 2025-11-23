@@ -2,9 +2,16 @@
 
 Швидкий старт для запуску повного CI/CD pipeline з Jenkins + Argo CD.
 
-## ⚠️ Free Tier Configuration
+## ⚠️ Instance Type Configuration
 
-Проєкт оптимізовано для **AWS Free Tier** з `t3.micro` instances!
+Проєкт налаштовано на **t3.small** (3 ноди) через обмеження AWS Free Tier.
+
+**Важливо**: AWS Free Tier блокує t3.medium та t2.medium з помилкою "not eligible for Free Tier".
+
+- **Instance Type**: t3.small (2 vCPU, 2 GB RAM)
+- **Nodes**: 3× t3.small
+
+!!! Поточний регіон в проєкті - "eu-north-1", за потреби його можна змінити.
 
 ## Передумови
 

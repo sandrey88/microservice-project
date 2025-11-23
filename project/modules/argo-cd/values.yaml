@@ -6,3 +6,30 @@ server:
 configs:
   params:
     server.insecure: true
+
+# Disable Dex (SSO) to save resources on t3.small
+dex:
+  enabled: false
+
+# Disable notifications to save resources on t3.small
+notifications:
+  enabled: false
+
+# Reduce resources for t3.small
+controller:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+repoServer:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 384Mi
+    requests:
+      cpu: 250m
+      memory: 192Mi
