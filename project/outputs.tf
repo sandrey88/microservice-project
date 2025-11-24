@@ -95,3 +95,48 @@ output "argocd_url_command" {
   description = "Команда для отримання Argo CD URL"
   value       = "kubectl get svc -n argocd argo-cd-argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
 }
+
+# ========================================
+# RDS Outputs
+# ========================================
+output "rds_endpoint" {
+  description = "Endpoint для підключення до RDS (якщо use_aurora = false)"
+  value       = module.rds.rds_endpoint
+}
+
+output "aurora_cluster_endpoint" {
+  description = "Writer endpoint для Aurora cluster (якщо use_aurora = true)"
+  value       = module.rds.aurora_cluster_endpoint
+}
+
+output "aurora_reader_endpoint" {
+  description = "Reader endpoint для Aurora cluster (якщо use_aurora = true)"
+  value       = module.rds.aurora_reader_endpoint
+}
+
+output "db_name" {
+  description = "Назва бази даних"
+  value       = module.rds.db_name
+}
+
+output "db_type" {
+  description = "Тип бази даних (RDS або Aurora)"
+  value       = module.rds.db_type
+}
+
+output "db_security_group_id" {
+  description = "ID security group для database"
+  value       = module.rds.security_group_id
+}
+
+output "db_connection_info" {
+  description = "Інформація для підключення до БД"
+  value = {
+    type     = module.rds.db_type
+    endpoint = module.rds.db_type == "Aurora" ? module.rds.aurora_cluster_endpoint : module.rds.rds_endpoint
+    port     = module.rds.db_port
+    database = module.rds.db_name
+    username = module.rds.db_username
+  }
+  sensitive = true
+}

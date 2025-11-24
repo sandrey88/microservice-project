@@ -8,6 +8,8 @@
 
 ![Скріншот Argo CD](argocd.png)
 
+![Скріншот RDS](rds.png)
+
 ## ⚠️ AWS Instance Type Configuration
 
 **Цей проєкт налаштовано на t3.small (3 ноди)**
@@ -44,6 +46,7 @@ InvalidParameterCombination - The specified instance type is not eligible for Fr
 - **VPC**: Публічні та приватні підмережі
 - **ECR**: Docker registry для образів
 - **EKS**: Kubernetes кластер з EBS CSI Driver
+- **RDS/Aurora**: PostgreSQL база даних (універсальний модуль)
 - **Jenkins**: CI сервер з автоматичною конфігурацією (JCasC)
 - **Argo CD**: GitOps CD інструмент з автоматичною синхронізацією
 
@@ -78,6 +81,13 @@ project/
 │   │   ├── aws_ebs_csi_driver.tf
 │   │   ├── variables.tf
 │   │   └── outputs.tf
+│   ├── rds/                     # ✨ RDS/Aurora PostgreSQL
+│   │   ├── rds.tf               # Звичайна RDS instance
+│   │   ├── aurora.tf            # Aurora cluster
+│   │   ├── shared.tf            # Спільні ресурси (SG, subnet group)
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── README.md            # Документація модуля
 │   ├── jenkins/                 # Jenkins з Helm + JCasC
 │   │   ├── jenkins.tf
 │   │   ├── values.yaml
@@ -309,7 +319,28 @@ echo "Argo CD Password: $ARGOCD_PASSWORD"
 2. Перевірте статус синхронізації
 3. Натисніть "Sync" якщо потрібно
 
-### Крок 9: Перевірка Django застосунку
+### Крок 9: Перевірка RDS Database
+
+```bash
+# Отримайте RDS endpoint
+terraform output rds_endpoint
+
+# Отримайте connection info
+terraform output -json db_connection_info
+
+# Підключіться до БД (якщо publicly_accessible = true)
+psql -h <rds-endpoint> -U postgres -d djangodb
+
+# Або через kubectl port-forward (якщо publicly_accessible = false)
+# Спочатку створіть pod для підключення
+kubectl run psql-client --rm -it --image=postgres:16 -- bash
+# В pod:
+psql -h <rds-endpoint> -U postgres -d djangodb
+```
+
+**Примітка**: За замовчуванням `publicly_accessible = false` для безпеки.
+
+### Крок 10: Перевірка Django застосунку
 
 ```bash
 # Отримайте URL Django app
@@ -472,6 +503,29 @@ kubectl get sc
 kubectl describe sc ebs-sc
 ```
 
+### RDS не підключається
+
+**Проблема**: Django не може підключитися до RDS
+
+**Рішення**:
+
+```bash
+# Перевірте RDS endpoint
+terraform output rds_endpoint
+
+# Перевірте Security Group
+terraform output db_security_group_id
+aws ec2 describe-security-groups --group-ids <sg-id>
+
+# Перевірте чи RDS доступна з EKS nodes
+kubectl run test-db --rm -it --image=postgres:16 -- bash
+# В pod:
+psql -h <rds-endpoint> -U postgres -d djangodb
+
+# Якщо не підключається - перевірте Security Group rules
+# Має дозволяти ingress з CIDR блоку VPC або EKS nodes
+```
+
 ⚠️ **Не забудьте видалити ресурси після тестування!**
 
 ## 🧹 Очищення ресурсів
@@ -499,6 +553,93 @@ terraform destroy
 aws s3 rb s3://terraform-state-andrii-project --force
 ```
 
+**Примітка**: RDS інстанс буде видалено автоматично через `terraform destroy`. Якщо `skip_final_snapshot = false`, буде створено final snapshot перед видаленням.
+
+## 🗄️ RDS Module - Універсальний модуль для баз даних
+
+### Особливості модуля
+
+Модуль `modules/rds/` підтримує:
+
+- ✅ **RDS або Aurora** - перемикання через `use_aurora = true/false`
+- ✅ **PostgreSQL та MySQL** - обидва engine
+- ✅ **Multi-AZ** - для high availability
+- ✅ **Автоматичні backup** - налаштовуваний retention
+- ✅ **Parameter Groups** - кастомізація параметрів
+- ✅ **Security Groups** - автоматичне створення
+- ✅ **Encryption** - за замовчуванням увімкнено
+
+### Приклади використання
+
+#### Звичайна RDS PostgreSQL (поточна конфігурація)
+
+```hcl
+module "rds" {
+  source = "./modules/rds"
+
+  name                = "project-django-db"
+  use_aurora          = false
+
+  engine              = "postgres"
+  engine_version      = "16.4"
+  instance_class      = "db.t3.small"
+  allocated_storage   = 20
+
+  db_name             = "djangodb"
+  username            = "postgres"
+  password            = var.db_password
+
+  vpc_id              = module.vpc.vpc_id
+  subnet_private_ids  = module.vpc.private_subnets
+  publicly_accessible = false
+  multi_az            = false
+
+  tags = {
+    Environment = "dev"
+  }
+}
+```
+
+#### Перемикання на Aurora
+
+Змініть в `main.tf`:
+
+```hcl
+module "rds" {
+  source = "./modules/rds"
+
+  name                          = "project-django-db"
+  use_aurora                    = true  # ← Змініть на true
+
+  # Aurora параметри
+  engine_cluster                = "aurora-postgresql"
+  engine_version_cluster        = "15.3"
+  parameter_group_family_aurora = "aurora-postgresql15"
+  aurora_replica_count          = 1  # Кількість reader реплік
+
+  instance_class                = "db.t3.medium"  # Aurora потребує мінімум t3.medium
+  # ... інші параметри
+}
+```
+
+### Outputs
+
+```bash
+# RDS endpoint (якщо use_aurora = false)
+terraform output rds_endpoint
+
+# Aurora endpoints (якщо use_aurora = true)
+terraform output aurora_cluster_endpoint  # Writer
+terraform output aurora_reader_endpoint   # Reader
+
+# Connection info
+terraform output -json db_connection_info
+```
+
+### Детальна документація
+
+Повна документація модуля: [`modules/rds/README.md`](modules/rds/README.md)
+
 ## 📚 Додаткові ресурси
 
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
@@ -506,3 +647,5 @@ aws s3 rb s3://terraform-state-andrii-project --force
 - [Kaniko Documentation](https://github.com/GoogleContainerTools/kaniko)
 - [EKS Best Practices](https://aws.github.io/aws-eks-best-practices/)
 - [Helm Documentation](https://helm.sh/docs/)
+- [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
+- [AWS Aurora Documentation](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/)

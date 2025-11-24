@@ -1,7 +1,7 @@
 # Створюємо S3-бакет
 resource "aws_s3_bucket" "terraform_state" {
   bucket        = var.bucket_name
-  force_destroy = true  # Дозволяє видалити бакет навіть якщо він не порожній (для навчального проєкту)
+  force_destroy = true # Дозволяє видалити бакет навіть якщо він не порожній (для навчального проєкту)
 
   tags = {
     Name        = "Terraform State Bucket"

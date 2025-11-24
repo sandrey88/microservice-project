@@ -1,7 +1,7 @@
 # ========================================
 # AWS Free Tier Configuration
 # ========================================
-# Instance type: t3.micro (Free Tier eligible)
+# Instance type: t3.small
 # Для production змініть на t3.medium або t3.large
 
 provider "aws" {
@@ -127,4 +127,55 @@ module "argo_cd" {
   }
 
   depends_on = [module.eks]
+}
+
+# ========================================
+# RDS Module
+# ========================================
+module "rds" {
+  source = "./modules/rds"
+
+  name       = "project-django-db"
+  use_aurora = false # Змініть на true для Aurora
+
+  # --- RDS-only параметри ---
+  engine                     = "postgres"
+  engine_version             = "16.4"
+  parameter_group_family_rds = "postgres16"
+
+  # --- Aurora-only параметри (якщо use_aurora = true) ---
+  engine_cluster                = "aurora-postgresql"
+  engine_version_cluster        = "15.3"
+  parameter_group_family_aurora = "aurora-postgresql15"
+  aurora_replica_count          = 1
+
+  # --- Спільні параметри ---
+  instance_class    = "db.t3.small" # Free Tier compatible
+  allocated_storage = 20
+  db_name           = "djangodb"
+  username          = "postgres"
+  password          = var.db_password # Додамо змінну
+
+  subnet_private_ids  = module.vpc.private_subnets
+  subnet_public_ids   = module.vpc.public_subnets
+  publicly_accessible = false # Для production = false
+  vpc_id              = module.vpc.vpc_id
+
+  multi_az                = false # Для Free Tier = false
+  backup_retention_period = 7
+  skip_final_snapshot     = true # Для dev/test = true
+
+  parameters = {
+    max_connections            = "100"
+    log_min_duration_statement = "1000"
+    shared_buffers             = "256MB"
+  }
+
+  tags = {
+    Environment = "dev"
+    Project     = "django-ci-cd"
+    ManagedBy   = "Terraform"
+  }
+
+  depends_on = [module.vpc]
 }

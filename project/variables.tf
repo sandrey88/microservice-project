@@ -18,3 +18,10 @@ variable "helm_repo_url" {
   description = "URL GitHub репозиторію з Helm charts (для Argo CD)"
   type        = string
 }
+
+variable "db_password" {
+  description = "Master password для RDS/Aurora database"
+  type        = string
+  sensitive   = true
+  default     = "ChangeMe123!" # Змініть на безпечний пароль
+}
