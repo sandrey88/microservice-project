@@ -25,3 +25,10 @@ variable "db_password" {
   sensitive   = true
   default     = "ChangeMe123!" # Змініть на безпечний пароль
 }
+
+variable "grafana_admin_password" {
+  description = "Admin password для Grafana"
+  type        = string
+  sensitive   = true
+  default     = "admin123" # Змініть на безпечний пароль
+}

@@ -4,12 +4,14 @@
 
 ## ⚠️ Instance Type Configuration
 
-Проєкт налаштовано на **t3.small** (3 ноди) через обмеження AWS Free Tier.
+Проєкт налаштовано для **AWS Free Tier** з оптимізацією:
 
-**Важливо**: AWS Free Tier блокує t3.medium та t2.medium з помилкою "not eligible for Free Tier".
+**Важливо**: AWS Free Tier має обмеження на типи інстансів.
 
-- **Instance Type**: t3.small (2 vCPU, 2 GB RAM)
-- **Nodes**: 3× t3.small
+- **EKS Nodes**: 3× t3.small (2 vCPU, 2 GB RAM)
+- **RDS Instance**: db.t3.micro (1 vCPU, 1 GB RAM) - Free Tier
+- **RDS Backup**: 1 день (Free Tier максимум)
+- **PostgreSQL**: версія 16.6
 
 !!! Поточний регіон в проєкті - "eu-north-1", за потреби його можна змінити.
 
@@ -87,6 +89,66 @@ kubectl get svc django-app-django -o jsonpath='{.status.loadBalancer.ingress[0].
 curl http://<URL>
 ```
 
+## Крок 7: Моніторинг - Prometheus + Grafana (2 хв)
+
+```bash
+# Перевірка pods
+kubectl get all -n monitoring
+
+# Prometheus (port-forward)
+kubectl port-forward svc/prometheus-server 9090:80 -n monitoring &
+
+# Grafana (port-forward)
+kubectl port-forward svc/grafana 3000:80 -n monitoring &
+
+# Отримати пароль Grafana
+kubectl get secret -n monitoring grafana -o jsonpath='{.data.admin-password}' | base64 -d
+# Пароль: admin123
+
+# Відкрийте в браузері:
+# Prometheus: http://localhost:9090
+# Grafana: http://localhost:3000
+# Login: admin / admin123
+```
+
+**Prometheus Queries для тестування:**
+
+В Prometheus UI (http://localhost:9090):
+
+1. **Status → Targets** - перевірити що endpoints UP:
+
+   - kubernetes-apiservers
+   - kubernetes-nodes
+   - kube-state-metrics
+   - node-exporter
+
+2. **Graph → Query:**
+
+   ```promql
+   # Pods по namespace
+   count(kube_pod_info) by (namespace)
+   ```
+
+3. **Graph → Query:**
+   ```promql
+   # Running pods
+   sum(kube_pod_status_phase{phase="Running"})
+   ```
+
+**Grafana Dashboards:**
+
+Після першого `terraform apply` Grafana вже містить попередньо налаштовані dashboards.
+
+**Якщо потрібно додати більше:**
+
+Імпортуйте через UI (Dashboards → Import):
+
+- Kubernetes Cluster (ID: 7249)
+- Kubernetes Pods (ID: 6417)
+- Node Exporter (ID: 1860)
+
+**Data Source:** Prometheus налаштовано автоматично при розгортанні
+
 ## Тестування CI/CD
 
 ```bash
@@ -110,12 +172,15 @@ git push
 ## Очищення
 
 ```bash
+# Видалити Helm releases
 helm uninstall django-app -n default
 helm uninstall argo-cd-apps -n argocd
 helm uninstall argo-cd -n argocd
 helm uninstall jenkins -n jenkins
+helm uninstall grafana -n monitoring
+helm uninstall prometheus -n monitoring
 
-# Почекайте 2 хв
+# Почекайте 2 хв (LoadBalancers видаляються)
 
 terraform destroy -auto-approve
 ```

@@ -140,3 +140,53 @@ output "db_connection_info" {
   }
   sensitive = true
 }
+
+# ========================================
+# Monitoring Outputs
+# ========================================
+output "monitoring_namespace" {
+  description = "Namespace для моніторингу"
+  value       = module.monitoring.namespace
+}
+
+output "prometheus_url" {
+  description = "Internal URL для Prometheus"
+  value       = module.monitoring.prometheus_url
+}
+
+output "prometheus_port_forward" {
+  description = "Команда для port-forward до Prometheus"
+  value       = module.monitoring.prometheus_port_forward_command
+}
+
+output "grafana_url" {
+  description = "Internal URL для Grafana"
+  value       = module.monitoring.grafana_url
+}
+
+output "grafana_port_forward" {
+  description = "Команда для port-forward до Grafana"
+  value       = module.monitoring.grafana_port_forward_command
+}
+
+output "grafana_admin_user" {
+  description = "Grafana admin username"
+  value       = module.monitoring.grafana_admin_user
+}
+
+output "grafana_admin_password" {
+  description = "Grafana admin password"
+  value       = module.monitoring.grafana_admin_password
+  sensitive   = true
+}
+
+output "monitoring_info" {
+  description = "Повна інформація про моніторинг"
+  value       = module.monitoring.monitoring_info
+  sensitive   = true
+}
+
+output "grafana_dashboards" {
+  description = "Список pre-installed Grafana dashboards"
+  value       = module.monitoring.grafana_dashboards
+}

@@ -7,7 +7,7 @@
 
 # Docker image configuration
 image:
-  repository: 671334746049.dkr.ecr.eu-north-1.amazonaws.com/project-django-app
+  repository: YOUR_AWS_ACCOUNT_ID.dkr.ecr.eu-north-1.amazonaws.com/project-django-app
   tag: "latest"
   pullPolicy: Always
 

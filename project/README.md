@@ -2,13 +2,18 @@
 
 Повний CI/CD pipeline для Django застосунку з автоматичним білдом, деплоєм та синхронізацією через GitOps.
 
-![Скріншот вебзастосунку](app.png)
 
-![Скріншот Jenkins](jenkins.png)
+![Скріншот Jenkins](1-jenkins.png)
 
-![Скріншот Argo CD](argocd.png)
+![Скріншот Argo CD](2-argocd.png)
 
-![Скріншот RDS](rds.png)
+![Скріншот вебзастосунку](3-app.png)
+
+![Скріншот Prometheus](4-prometheus.png)
+
+![Скріншот Prometheus Expression](5-prometheus-expression.png)
+
+![Скріншот Grafana](6-grafana.png)
 
 ## ⚠️ AWS Instance Type Configuration
 
@@ -24,9 +29,11 @@ InvalidParameterCombination - The specified instance type is not eligible for Fr
 
 Тому використовуємо **t3.small** з оптимізацією:
 
-- **Instance Type**: `t3.small` (2 vCPU, 2 GB RAM)
-- **Nodes**: 3× t3.small (для Jenkins pipeline потрібна окрема нода)
-- **Оптимізація**: Зменшені ресурси Jenkins та Argo CD
+- **EKS Nodes**: 3× `t3.small` (2 vCPU, 2 GB RAM)
+- **RDS Instance**: `db.t3.micro` (1 vCPU, 1 GB RAM) - **Free Tier**
+- **RDS Backup**: 1 день retention (Free Tier максимум)
+- **PostgreSQL**: версія 16.6 (доступна для Free Tier)
+- **Оптимізація**: Зменшені ресурси для всіх компонентів
 - **Argo CD**: Вимкнено Dex (SSO) та Notifications
 - **Storage**: EBS volumes через EBS CSI Driver
 
@@ -34,7 +41,7 @@ InvalidParameterCombination - The specified instance type is not eligible for Fr
 
 - **Нода 1**: Argo CD pods (~900 MB RAM)
 - **Нода 2**: Jenkins controller (~600 MB RAM)
-- **Нода 3**: Jenkins pipeline pod (~600 MB RAM)
+- **Нода 3**: Jenkins pipeline pod + Monitoring (~800 MB RAM)
 
 **Для production** рекомендується t3.medium або більше.
 
@@ -49,6 +56,7 @@ InvalidParameterCombination - The specified instance type is not eligible for Fr
 - **RDS/Aurora**: PostgreSQL база даних (універсальний модуль)
 - **Jenkins**: CI сервер з автоматичною конфігурацією (JCasC)
 - **Argo CD**: GitOps CD інструмент з автоматичною синхронізацією
+- **Prometheus + Grafana**: Моніторинг та візуалізація метрик
 
 !!! Поточний регіон в проєкті - "eu-north-1", за потреби його можна змінити.
 
@@ -81,7 +89,7 @@ project/
 │   │   ├── aws_ebs_csi_driver.tf
 │   │   ├── variables.tf
 │   │   └── outputs.tf
-│   ├── rds/                     # ✨ RDS/Aurora PostgreSQL
+│   ├── rds/                     # RDS/Aurora PostgreSQL
 │   │   ├── rds.tf               # Звичайна RDS instance
 │   │   ├── aurora.tf            # Aurora cluster
 │   │   ├── shared.tf            # Спільні ресурси (SG, subnet group)
@@ -94,18 +102,26 @@ project/
 │   │   ├── variables.tf
 │   │   ├── outputs.tf
 │   │   └── providers.tf
-│   └── argo-cd/                 # Argo CD з Applications
-│       ├── argo_cd.tf
-│       ├── values.yaml
+│   ├── argo-cd/                 # Argo CD з Applications
+│   │   ├── argo_cd.tf
+│   │   ├── values.yaml
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   └── charts/              # Helm chart для Argo Applications
+│   │       ├── Chart.yaml
+│   │       ├── values.yaml
+│   │       └── templates/
+│   │           ├── application.yaml
+│   │           └── repository.yaml
+│   └── monitoring/              # Prometheus + Grafana
+│       ├── monitoring.tf        # Helm releases
+│       ├── prometheus-values.yaml
+│       ├── grafana-values.yaml
 │       ├── variables.tf
 │       ├── outputs.tf
 │       ├── providers.tf
-│       └── charts/              # Helm chart для Argo Applications
-│           ├── Chart.yaml
-│           ├── values.yaml
-│           └── templates/
-│               ├── application.yaml
-│               └── repository.yaml
+│       └── README.md            # Документація модуля
 │
 └── charts/
     └── django-app/              # Helm chart для Django
@@ -282,13 +298,27 @@ kubectl get pods --all-namespaces
 
 ### Крок 7: Доступ до Jenkins
 
+**⚠️ Важливо:** Jenkins LoadBalancer може бути недоступний через Security Group обмеження.
+
+**Рекомендований спосіб (port-forward):**
+
 ```bash
-# Отримайте URL Jenkins
-JENKINS_URL=$(kubectl get svc -n jenkins jenkins -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-echo "Jenkins URL: http://$JENKINS_URL"
+# Port-forward до Jenkins
+kubectl port-forward -n jenkins svc/jenkins 8080:80 &
+
+# Відкрийте в браузері
+echo "Jenkins URL: http://localhost:8080"
 
 # Логін: admin
 # Пароль: admin123
+```
+
+**Альтернатива (LoadBalancer):**
+
+```bash
+# Якщо LoadBalancer доступний
+JENKINS_URL=$(kubectl get svc -n jenkins jenkins -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "Jenkins URL: http://$JENKINS_URL"
 ```
 
 **В Jenkins UI:**
@@ -640,6 +670,126 @@ terraform output -json db_connection_info
 
 Повна документація модуля: [`modules/rds/README.md`](modules/rds/README.md)
 
+---
+
+## 📊 Monitoring Module - Prometheus + Grafana
+
+### Особливості модуля
+
+Модуль `modules/monitoring/` забезпечує повноцінний моніторинг Kubernetes кластера:
+
+- ✅ **Prometheus** - збір та зберігання метрик
+- ✅ **Grafana** - візуалізація з pre-installed dashboards
+- ✅ **Node Exporter** - метрики з Kubernetes нод
+- ✅ **Kube State Metrics** - метрики Kubernetes об'єктів
+- ✅ **Alertmanager** - управління алертами
+- ✅ **Persistent Storage** - збереження даних через EBS
+- ✅ **Resource Optimized** - налаштовано для t3.small
+
+### Grafana Dashboards
+
+Grafana налаштовано з Prometheus Data Source автоматично.
+
+**Рекомендовані dashboards для імпорту:**
+
+| Dashboard              | ID   | Опис                     |
+| ---------------------- | ---- | ------------------------ |
+| **Kubernetes Cluster** | 7249 | Загальний огляд кластера |
+| **Kubernetes Pods**    | 6417 | Метрики подів            |
+| **Node Exporter**      | 1860 | Детальні метрики нод     |
+
+**Імпорт через UI:** Dashboards → Import → введіть ID → Load → Select Prometheus → Import
+
+### Приклад використання
+
+```hcl
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  cluster_name           = "my-eks-cluster"
+  namespace              = "monitoring"
+  grafana_admin_password = "SecurePassword123!"
+
+  # Prometheus
+  prometheus_retention    = "15d"
+  prometheus_storage_size = "8Gi"
+
+  # Grafana
+  grafana_storage_size = "5Gi"
+
+  # Exporters
+  enable_node_exporter      = true
+  enable_kube_state_metrics = true
+}
+```
+
+### Доступ до сервісів
+
+#### Prometheus
+
+```bash
+# Port-forward
+kubectl port-forward -n monitoring svc/prometheus-server 9090:80
+
+# Відкрийте в браузері
+http://localhost:9090
+
+# Перевірте targets
+# Status → Targets (має бути UP: kubernetes-apiservers, kubernetes-nodes, kube-state-metrics, node-exporter)
+
+# Приклади queries:
+# count(kube_pod_info) by (namespace)
+# sum(kube_pod_status_phase{phase="Running"})
+# rate(apiserver_request_total[5m])
+```
+
+#### Grafana
+
+```bash
+# Port-forward
+kubectl port-forward -n monitoring svc/grafana 3000:80
+
+# Відкрийте в браузері
+http://localhost:3000
+
+# Логін
+Username: admin
+Password: <ваш grafana_admin_password>
+```
+
+#### Отримати пароль Grafana
+
+```bash
+# Через Terraform output
+terraform output -raw grafana_admin_password
+
+# Або через kubectl
+kubectl get secret -n monitoring grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+```
+
+### Outputs
+
+```bash
+# Prometheus URL
+terraform output prometheus_url
+
+# Grafana URL
+terraform output grafana_url
+
+# Port-forward команди
+terraform output prometheus_port_forward
+terraform output grafana_port_forward
+
+# Повна інформація
+terraform output -json monitoring_info
+```
+
+### Детальна документація
+
+Повна документація модуля: [`modules/monitoring/README.md`](modules/monitoring/README.md)
+
+---
+
 ## 📚 Додаткові ресурси
 
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
@@ -649,3 +799,6 @@ terraform output -json db_connection_info
 - [Helm Documentation](https://helm.sh/docs/)
 - [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
 - [AWS Aurora Documentation](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/)
+- [Prometheus Documentation](https://prometheus.io/docs/)
+- [Grafana Documentation](https://grafana.com/docs/)
+- [Grafana Dashboards](https://grafana.com/grafana/dashboards/)

@@ -1,0 +1,91 @@
+# Grafana Values для t3.small nodes
+adminPassword: ${admin_password}
+
+persistence:
+  enabled: true
+  size: ${storage_size}
+  storageClassName: "ebs-sc"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 250m
+    memory: 512Mi
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Datasources
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        access: proxy
+        isDefault: true
+        editable: true
+
+# Dashboards providers
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: "default"
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+# Pre-installed dashboards
+dashboards:
+  default:
+    # Kubernetes Cluster Monitoring
+    kubernetes-cluster:
+      gnetId: 7249
+      revision: 1
+      datasource: Prometheus
+
+    # Kubernetes Pods
+    kubernetes-pods:
+      gnetId: 6417
+      revision: 1
+      datasource: Prometheus
+
+    # Node Exporter Full
+    node-exporter:
+      gnetId: 1860
+      revision: 31
+      datasource: Prometheus
+
+    # Kubernetes Deployment
+    kubernetes-deployment:
+      gnetId: 8588
+      revision: 1
+      datasource: Prometheus
+
+# Grafana ini config
+grafana.ini:
+  server:
+    root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+  analytics:
+    check_for_updates: true
+  log:
+    mode: console
+  grafana_net:
+    url: https://grafana.net
+
+# Plugins
+plugins:
+  - grafana-piechart-panel
+  - grafana-clock-panel
+# SMTP settings (optional)
+# smtp:
+#   enabled: false

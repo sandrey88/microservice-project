@@ -140,7 +140,7 @@ module "rds" {
 
   # --- RDS-only параметри ---
   engine                     = "postgres"
-  engine_version             = "16.4"
+  engine_version             = "16.6"
   parameter_group_family_rds = "postgres16"
 
   # --- Aurora-only параметри (якщо use_aurora = true) ---
@@ -150,7 +150,7 @@ module "rds" {
   aurora_replica_count          = 1
 
   # --- Спільні параметри ---
-  instance_class    = "db.t3.small" # Free Tier compatible
+  instance_class    = "db.t3.micro" # Free Tier: db.t3.micro або db.t4g.micro
   allocated_storage = 20
   db_name           = "djangodb"
   username          = "postgres"
@@ -162,13 +162,13 @@ module "rds" {
   vpc_id              = module.vpc.vpc_id
 
   multi_az                = false # Для Free Tier = false
-  backup_retention_period = 7
-  skip_final_snapshot     = true # Для dev/test = true
+  backup_retention_period = 1     # Free Tier максимум = 1 день
+  skip_final_snapshot     = true  # Для dev/test = true
 
   parameters = {
-    max_connections            = "100"
+    max_connections            = "50"     # Для db.t3.micro (1 GB RAM)
     log_min_duration_statement = "1000"
-    shared_buffers             = "256MB"
+    shared_buffers             = "16384"  # 128MB in 8KB pages (для 1GB RAM)
   }
 
   tags = {
@@ -178,4 +178,41 @@ module "rds" {
   }
 
   depends_on = [module.vpc]
+}
+
+# ========================================
+# Monitoring Module - Prometheus + Grafana
+# ========================================
+module "monitoring" {
+  source = "./modules/monitoring"
+
+  cluster_name           = module.eks.eks_cluster_name
+  namespace              = "monitoring"
+  grafana_admin_password = var.grafana_admin_password
+
+  # Prometheus налаштування
+  prometheus_chart_version = "25.8.0"
+  prometheus_retention     = "15d"
+  prometheus_storage_size  = "8Gi"
+
+  # Grafana налаштування
+  grafana_chart_version = "7.0.8"
+  grafana_storage_size  = "5Gi"
+
+  # Exporters
+  enable_node_exporter      = true
+  enable_kube_state_metrics = true
+
+  tags = {
+    Environment = "dev"
+    Project     = "django-ci-cd"
+    ManagedBy   = "Terraform"
+  }
+
+  providers = {
+    helm       = helm
+    kubernetes = kubernetes
+  }
+
+  depends_on = [module.eks]
 }
