@@ -2,10 +2,9 @@
 
 Повний CI/CD pipeline для Django застосунку з автоматичним білдом, деплоєм та синхронізацією через GitOps.
 
-
 ![Скріншот Jenkins](1-jenkins.png)
 
-![Скріншот Argo CD](2-argocd.png)
+![Скріншот Argo CD](2-argo-cd.png)
 
 ![Скріншот вебзастосунку](3-app.png)
 
